@@ -1,0 +1,1240 @@
+
+
+<html>
+<head>
+    
+    
+    <title>Mountains</title>
+<link rel="stylesheet" type="text/css" href="mountdew.css"/>
+    <script src="https://code.jquery.com/jquery-2.1.4.js"></script>
+
+       
+</head>
+    
+<script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/gl-matrix/2.3.2/gl-matrix-min.js"></script>
+
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    <script id="shader-fs2" type="x-shader/x-fragment">
+ 
+ precision highp float;
+ 
+uniform sampler2D iChannel1;
+uniform vec2 resolution;
+uniform float iGlobalTime;
+
+varying vec3 vPosition;
+varying vec3 vNormal;
+varying vec2 vUv;
+
+float time=iGlobalTime/1500.;
+
+//My first raymarching attempt. Shadow rays + 1 bounce reflection.
+// I tried to improvise as much as I could, and "steal" the minimum amount of code
+//References were iq's articles and the /r/twotriangles raymarching tutorial on reddit. 
+
+float sphere(vec3 pos, float radius)
+{
+    
+    return length(pos) - radius ;
+}
+
+//http://www.iquilezles.org/www/articles/smin/smin.htm
+vec2 smin( vec2 a, vec2 b, float k )
+{
+    float minid=(a.x<b.x)? a.y:b.y;
+    float h = clamp( 0.5+0.5*(b.x-a.x)/k, 0.0, 1.0 );
+    return vec2(mix( b.x, a.x, h ) - k*h*(1.0-h),minid);
+}
+
+//from iq's raymarching primitives
+vec2 box( vec3 p, vec3 b )
+{
+  vec3 d = abs(p) - b;
+  return vec2(min(max(d.x,max(d.y,d.z)),0.0) + length(max(d,0.0)),-44.0);
+}
+
+vec2 boxTwist( vec3 p,vec3 size )
+{
+    float c = cos(5.0*p.y);
+    float s = sin(5.0*p.y);
+    mat2  m = mat2(c,-s,s,c);
+    vec3  q = vec3(m*p.xz,p.y);
+    return box(q,size);
+}
+vec2 plane(vec3 pos)
+{
+ return vec2(pos.y+90.0,-99.0);   
+}
+
+//http://www.iquilezles.org/www/articles/distfunctions/distfunctions.htm
+vec2 opU( vec2 d1, vec2 d2 )
+{
+	return (d1.x<d2.x) ? d1 : d2;
+}
+
+//http://www.iquilezles.org/www/articles/distfunctions/distfunctions.htm
+vec2 boxDisplace( vec3 p,vec3 size )
+{
+    vec2 d1 = box((abs(cos(0.25*time))*.25-0.7)*p,size);
+    float d2 =1.0;
+    
+    return vec2(d1.x+d2,d1.y);
+}
+
+vec2 spheremore(vec3 pos,float radius)
+{
+    float min = 10000.0;
+    int mindex=-1;
+
+    
+    for(int i=0;i<5;i++)
+    {
+     vec3 center=vec3(16.5*cos(float(i))*sin(time),0.0,float(i)*11.5*cos(time));
+     float distance = length(pos-center)-radius;
+     if((distance)<(min)) 
+     {
+         min=distance;
+         mindex=i;
+     }
+
+    }
+    
+    return vec2(min,float(mindex));
+}
+
+
+//http://www.iquilezles.org/www/articles/distfunctions/distfunctions.htm
+float opS( float d1, float d2 )
+{
+    return max(-d1,d2);
+}
+
+vec2 distfunc(vec3 pos)
+{  
+    vec2 inter=smin(( spheremore(pos/1.0,2.0)),boxDisplace(pos-vec3(0.0-7.0*cos(time),-10.0,4.0*sin(0.3*time)),vec3(5.0,5.0,5.0)),3.0 );
+    vec2 ops=opU(plane(pos),inter );
+    return ops;
+
+}
+
+
+vec3 retcol(float identif)
+{
+ vec3 color=vec3(0.0);
+    
+    if(identif==0.0)
+    {
+        color=vec3(0.7,0.7,0.9);
+    }
+    else if(identif==1.0)
+    {
+     	color=vec3(0.0,0.0,0.00);   
+    }
+     else if(identif==2.0)
+    {
+     	color=vec3(0.1,0.2,0.8);   
+    }
+     else if(identif==3.0)
+    {
+     	color=vec3(0.1,0.6,0.9);   
+    }
+     else if(identif==4.0)
+    {
+     	color=vec3(0.2,0.9,0.6);   
+    }
+     else if(identif==-44.0)
+    {
+     	color=vec3(1.0,1.0,1.0);   
+    }
+     else if(identif==-99.0)
+    {
+     	color=vec3(0.8,0.1,0.2);   
+    }
+    else
+    {
+        color=vec3(0.0,1.0,1.0);   
+    }
+    
+    return color;
+    
+}
+
+vec3 rayMarch(vec3 pos,vec3 rayDir,float EPSILON,out vec2 dist)
+{
+    float mini=999999.0;
+    float origid=dist.y;
+    for (int i = 0; i < 120; i++)
+    {       
+        if ((dist.x < EPSILON))   continue;   
+        
+        dist = distfunc(pos); 
+        pos += dist.x * rayDir;
+        if(dist.x<mini) mini=dist.x;
+        dist.x=mini;
+    }
+    return pos;
+}
+
+vec3 shadowMarch(vec3 pos,vec3 rayDir,float EPSILON,out vec2 dist)
+{
+    float mini=999999.0;
+    float origid=dist.y;
+    for (int i = 0; i < 40; i++)
+    {       
+        if ((dist.x < EPSILON)&&(dist.y!=origid))   continue;   
+        
+        dist = distfunc(pos); 
+        pos += dist.x * rayDir;
+        if(dist.x<mini) mini=dist.x;
+        dist.x=mini;
+    }
+    return pos;
+}
+
+
+
+//https://www.reddit.com/r/twotriangles/comments/1hy5qy/tutorial_1_writing_a_simple_distance_field/
+vec3 calculateNormal(float EPSILON, vec3 pos)
+{
+  	vec2 eps = vec2(0.0, EPSILON);
+	vec3 normal = normalize(vec3(
+    distfunc(pos + eps.yxx).x - distfunc(pos - eps.yxx).x,
+    distfunc(pos + eps.xyx).x - distfunc(pos - eps.xyx).x,
+    distfunc(pos + eps.xxy).x - distfunc(pos - eps.xxy).x));
+            
+    return normal;
+}
+
+vec3 tempNormal(vec3 pos,float id,float EPSILON)
+{
+    vec3 normal=vec3(0.0);
+    if(id>=0.0)
+    {
+         normal=normalize(pos-vec3(16.5*cos(float(id))*sin(time),0.0,float(id)*11.5*cos(time)));
+
+    }
+    else if(id==-99.0)
+    {
+        normal=normalize(vec3(0.0,pos.y+90.01,0.0));
+    }
+    else
+    {
+        normal=calculateNormal(EPSILON,pos);
+    }
+   return normal;
+    
+}
+
+void getRay(vec2 screenPos,out vec3 cameraOrigin,out vec3 rayDir)
+{
+    cameraOrigin = vec3(2.0+3.0*cos(time), +16.0+6.0*cos(time), 5.0+1.0*cos(time));  
+    vec3 cameraTarget = vec3(0.0, 0.0, 0.0);
+    vec3 upDirection = vec3(0.0, 1.0, 0.0);
+    vec3 cameraDir = normalize(cameraTarget - cameraOrigin);
+    vec3 cameraRight = normalize(cross(upDirection, cameraOrigin));
+	vec3 cameraUp = cross(cameraDir, cameraRight);
+    rayDir = normalize(cameraRight * screenPos.x + cameraUp * screenPos.y + cameraDir);
+   
+
+}
+
+
+vec4 render(vec2 ScreenPos)
+{
+    vec3 rayDir=vec3(0.0);
+    vec3 pos=vec3(0.0);
+    getRay(ScreenPos,pos,rayDir);
+    
+ 
+    const int MAX_ITER = 100;
+    const float MAX_DIST = 20.0; 
+    float EPSILON = 0.001;
+    float totalDist = 0.0;
+    vec2 dist = vec2(EPSILON,0.0);
+    vec3 lightpos=vec3(25.0,55.0,0.0);
+
+    //initial march towards objects
+    pos=rayMarch(pos,rayDir,EPSILON,dist);
+                     
+   if (dist.x <EPSILON)
+{
+     vec3 normal=tempNormal(pos,dist.y,EPSILON);
+    
+   
+    vec3  lightdir=   normalize(lightpos-pos);  
+    vec3 halfvec= normalize(lightdir-rayDir);
+    vec3 reflected= normalize(reflect(rayDir,normal));
+    vec3 color=vec3(0.0);
+    
+    EPSILON=0.01;
+        
+    //shadow ray 
+    vec2 shadowdist=vec2(EPSILON,dist.y);
+    vec3 shadowpos=shadowMarch(pos+2.0*lightdir,lightdir,EPSILON,shadowdist);
+    if((shadowdist.x<EPSILON)&&(shadowdist.y!=dist.y))
+    {
+        color=vec3(0.0,0.0,0.0);
+    }
+    else
+    {
+     
+        
+    float diffuse = max(0.0, dot(lightdir, normal));
+    float specular = pow(dot(normal,halfvec), 64.0);
+    color = vec3(retcol(dist.y)*(diffuse + specular));
+          
+     //soft shadows
+    float penumbra=75.0;
+    if(shadowdist.x<penumbra*EPSILON) color*=shadowdist.x/(penumbra*EPSILON);  
+            
+    //reflection rays  
+    EPSILON=0.0001;    
+        
+    vec2 reflectdist=vec2(EPSILON,dist.y);
+    vec3 reflecpos=shadowMarch(pos+0.1*reflected,reflected,EPSILON,reflectdist);
+      if((reflectdist.x<EPSILON)&&(reflectdist.y!=dist.y))
+      {
+              
+        vec3 lightdir2= normalize(lightpos-reflecpos);
+        vec3 halfvec2= normalize(lightdir2-reflected);
+        
+        //check if reflection point is in shadow
+        vec2 shadowrefdist=vec2(EPSILON,reflectdist);
+        vec3 shadowrefpos= shadowMarch(reflecpos+0.01*lightdir2,lightdir2,EPSILON,shadowrefdist);                      
+                 if((shadowrefdist.x>=EPSILON))
+                 {                  
+                                          
+                vec3 reflecnormal=tempNormal(reflecpos,reflectdist.y,EPSILON);
+
+                float diffuseR = max(0.0, dot(lightdir2, reflecnormal));
+                float specularR =pow(dot(reflecnormal,halfvec2), 4.0);      
+                vec3 reflecolor= vec3(retcol(reflectdist.y)*(diffuseR+specularR));
+                color= color+0.2*reflecolor;
+                 }
+
+      }
+        
+    }    
+    
+	return vec4(color, 1.0);
+}
+else
+{
+    return vec4(vec3(retcol(dist.y)),1.0);
+}
+  
+}
+
+ 
+
+
+
+void main()
+{
+    vec2 uv = vUv.xy / resolution.xy;
+    vec2 xy = -1.0 + 2.0 * gl_FragCoord.xy / resolution.xy;
+    vec2 screenPos = -1.0 + 2.0 * gl_FragCoord.xy / resolution.xy;
+    screenPos.x *= resolution.x / resolution.y;
+    gl_FragColor= render(screenPos);
+}
+
+</script>
+
+
+
+    
+    
+
+<script id="shader-vs2" type="x-shader/x-vertex">
+
+precision highp float;
+
+uniform mat4 modelViewMatrix;
+uniform mat4 projectionMatrix;
+
+attribute vec3 position;
+attribute vec3 normal;
+attribute vec2 uv;
+
+
+
+varying vec3 vPosition;
+varying vec3 vNormal;
+varying vec2 vUv;
+ 
+
+void main() {
+
+    vNormal = normal;
+    vUv = uv;
+   gl_PointSize=10.0;
+    vPosition = position;
+    gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 );
+
+}
+</script>
+
+  
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+<script id="shader-fs1" type="x-shader/x-fragment">
+ 
+ precision highp float;
+ 
+uniform sampler2D iChannel1;
+uniform vec2 resolution;
+uniform float iGlobalTime;
+
+varying vec3 vPosition;
+varying vec3 vNormal;
+varying vec2 vUv;
+
+
+float pi = 3.14159265358979323846264338;
+
+float cosfun(float x, float z, float freq1, float freq2) 
+{
+    return cos(2. * pi * freq1 * x) * cos(2. * pi * freq2 * z);
+}
+
+const mat2 rotate2D = mat2(1.3623, 1.7531, -1.7131, 1.4623);
+float terrain(float x, float z) 
+{
+    vec2 pos = vec2(x, z);
+    pos = rotate2D * pos;
+    float sum = 0.0;
+    float hdetail = 24.15;
+    float pepper = 0.;
+    for (float i = 5.0; i < 15.; i += 5.) 
+    {
+        sum += (i / 3.6905) * texture2D(iChannel1, pos / hdetail).x;
+        hdetail *= 2.;
+    }
+    float ldetail = 512.;
+    for (float i = 5.0; i < 15.; i += 5.) 
+    {
+        ldetail *= 2.;
+        sum += (12. * i) * texture2D(iChannel1, pos / ldetail).y;
+    }
+    return 0.0585 * sum;
+}
+vec3 sky(in vec3 color, in vec3 lightpos, in vec3 rayDir, in vec3 camo) 
+{
+    float sundot = clamp(dot(rayDir, lightpos), 0.5, 1.0);
+    vec3 col = vec3(0.3, .7, 0.8) * (1.0 - 0.5 * rayDir.y) * 1.0;
+    col += 0.65 * vec3(0.2, 0.7, 0.9) * pow(sundot, 32.0);
+    col += 0.52 * vec3(0.75, 0.7, 0.9) * pow(sundot, 12.0);
+    col = mix(col, vec3(0.6, 0.6, 0.85), pow(1.0 - max(rayDir.y, 0.2), 0.85));
+    return col;
+}
+vec3 rayMarch(vec3 pos, vec3 rayDir, float EPSILON, out float dist, out float sdist) 
+{
+    float mini = 999999.0;
+    float stepsize = 0.07;
+    const float maxd = 26.0;
+    const float maxiter = 900.;
+    float wtv = 0.0;
+    float stepdist = 0.;
+    for (float i = 0.0; i < maxiter; i += 1.) 
+    {
+        float height = terrain(pos.x, pos.z);
+        dist = pos.y - height;
+        if ((dist < EPSILON) || (stepdist > maxd)) 
+        {
+            wtv = stepdist;
+            break;
+        }
+ else 
+        {
+            stepdist += stepsize;
+            pos += rayDir * stepsize;
+            stepsize *= 1.01;
+        }
+        wtv = stepdist;
+    }
+    sdist = distance(pos - wtv * rayDir, pos);
+    return pos;
+}
+vec3 calculateNormal(float EPSILON, vec3 pos) 
+{
+    vec3 normal = normalize(vec3(terrain(pos.x + EPSILON, pos.z) - terrain(pos.x - EPSILON, pos.z), 2.0 * EPSILON, terrain(pos.x, pos.z + EPSILON) - terrain(pos.x, pos.z - EPSILON)));
+    return normal;
+}
+void getRay(vec2 screenPos, out vec3 cameraOrigin, out vec3 rayDir, out vec3 lightpos) 
+{
+    cameraOrigin = vec3(0.0, 7.75, iGlobalTime*0.002);
+    vec3 cameraTarget = vec3(0.0, 0.0, cameraOrigin.z + 30.);
+    vec3 upDirection = vec3(0.0, 1.0, 0.0);
+    vec3 cameraDir = normalize(cameraTarget - cameraOrigin);
+    vec3 cameraRight = normalize(cross(upDirection, cameraOrigin));
+    vec3 cameraUp = cross(cameraDir, cameraRight);
+    lightpos.z = cameraOrigin.z + 35.0;
+    lightpos.y = cameraOrigin.y + 20.;
+    rayDir = normalize(cameraRight * screenPos.x + cameraUp * screenPos.y + cameraDir);
+}
+vec3 applyFog(in vec3 rgb, in float distance) 
+{
+    float b = 0.225;
+    float fogAmount = 1.0 - exp(-distance * b);
+    vec3 fogColor = vec3(0.55* exp(0.045 * distance * b), 0.56* exp(0.045 * distance * b), 0.67 * exp(0.045 * distance * b));
+    return mix(rgb, fogColor, fogAmount);
+}
+vec4 render(vec2 ScreenPos) 
+{
+    vec3 rayDir = vec3(0.0);
+    vec3 pos = vec3(0.0);
+    vec3 lightpos = vec3(25.0, 55.0, 0.0);
+    getRay(ScreenPos, pos, rayDir, lightpos);
+    vec3 camo = pos;
+    const int MAX_ITER = 100;
+    const float MAX_DIST = 30.0;
+    float EPSILON = 0.01;
+    float totalDist = 0.0;
+    float dist = 0.0;
+    float sdist = 0.0;
+    vec3 color = vec3(0.0);
+    pos = rayMarch(pos, rayDir, EPSILON, dist, sdist);
+    if ((dist) < EPSILON) 
+    {
+        EPSILON = 0.01;
+        vec3 normal = calculateNormal(EPSILON, pos);
+        vec3 lightdir = normalize(lightpos - pos);
+        vec3 halfvec = normalize(lightdir - rayDir);
+        vec3 reflected = normalize(reflect(rayDir, normal));
+        EPSILON = 0.01;
+        
+        {
+            color = vec3(0.0, 0.0, 0.0);
+        }
+        
+        {
+            float diffuse = max(0.0, dot(lightdir, normal));
+            color = vec3(0.45, 0.45, 0.45) * mix(diffuse, pos.y, 0.05);
+            color = applyFog(color, sdist);
+            return vec4(color, 1.0);
+          //  return vec4(0.00001*iGlobalTime,0.0,0.0,1.0);
+        }
+    }
+     return vec4(sky(color, lightpos, rayDir, camo), 1.0);
+}
+void main() 
+{
+    vec2 uv = vUv.xy / resolution.xy;
+    vec2 xy = -1.0 + 2.0 * gl_FragCoord.xy / resolution.xy;
+    vec2 screenPos = -1.0 + 2.0 * gl_FragCoord.xy / resolution.xy;
+    screenPos.x *= resolution.x / resolution.y;
+    gl_FragColor = render(screenPos);
+  //  gl_FragColor= vec4(1.0,0.0,0.0,1.0);
+}
+
+</script>
+
+
+
+    
+    
+
+<script id="shader-vs1" type="x-shader/x-vertex">
+
+precision highp float;
+
+uniform mat4 modelViewMatrix;
+uniform mat4 projectionMatrix;
+
+attribute vec3 position;
+attribute vec3 normal;
+attribute vec2 uv;
+
+
+
+varying vec3 vPosition;
+varying vec3 vNormal;
+varying vec2 vUv;
+ 
+
+void main() {
+
+    vNormal = normal;
+    vUv = uv;
+   gl_PointSize=10.0;
+    vPosition = position;
+    gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 );
+
+}
+</script>
+
+  
+
+
+
+
+
+
+<script>
+
+    var gl;
+
+    function initGL(canvas) {
+        try {
+            gl = canvas.getContext("experimental-webgl");
+            gl.viewportWidth = canvas.width;
+            gl.viewportHeight = canvas.height;
+        } catch (e) {
+        }
+        if (!gl) {
+            alert("Could not initialise WebGL, sorry :-(");
+        }
+    }
+
+
+    function getShader(gl, id) {
+        var shaderScript = document.getElementById(id);
+        if (!shaderScript) {
+            return null;
+        }
+
+        var str = "";
+        var k = shaderScript.firstChild;
+        while (k) {
+            if (k.nodeType == 3) {
+                str += k.textContent;
+            }
+            k = k.nextSibling;
+        }
+
+        var shader;
+        if (shaderScript.type == "x-shader/x-fragment") {
+            shader = gl.createShader(gl.FRAGMENT_SHADER);
+        } else if (shaderScript.type == "x-shader/x-vertex") {
+            shader = gl.createShader(gl.VERTEX_SHADER);
+        } else {
+            return null;
+        }
+
+        gl.shaderSource(shader, str);
+        gl.compileShader(shader);
+
+        if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+            alert(gl.getShaderInfoLog(shader));
+            return null;
+        }
+
+        return shader;
+    }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+    
+    var shaderProgram;
+     var mvMatrix = mat4.create();
+    var pMatrix = mat4.create();
+
+
+    var vertexPositionBuffer ;
+    var vertexNormalBuffer;
+    var vertexTextureBuffer;
+
+
+
+            var vertices = [
+                1.0,  1.0,  0.0,
+                -1.0,  1.0,  0.0,
+                1.0, -1.0,  0.0,
+                -1.0, -1.0,  0.0   ];
+            
+           var normals = [ 0.0, 0.0 ,1.0,
+                          0.0, 0.0 ,1.0,
+                          0.0, 0.0 ,1.0,
+                          0.0, 0.0 ,1.0];         
+         
+         var textures=[
+           1.0, 1.0,
+           0.0 , 1.0,
+           1.0, 0.0,
+           0.0, 0.0 ];
+
+
+    function initShaders(number) {
+        if(number==1)
+            {
+        var fragmentShader = getShader(gl, "shader-fs1");
+        var vertexShader = getShader(gl, "shader-vs1");
+            }
+        else if(number==2)
+            {
+              var fragmentShader = getShader(gl, "shader-fs2");
+              var vertexShader = getShader(gl, "shader-vs2");
+            }
+        
+        shaderProgram = gl.createProgram();
+        gl.attachShader(shaderProgram, vertexShader);
+        gl.attachShader(shaderProgram, fragmentShader);
+        gl.linkProgram(shaderProgram);
+
+        if (!gl.getProgramParameter(shaderProgram, gl.LINK_STATUS)) {
+            alert("Could not initialise shaders");
+        }
+
+        gl.useProgram(shaderProgram);
+
+        shaderProgram.vertexPositionAttribute = gl.getAttribLocation(shaderProgram, "position");
+        gl.enableVertexAttribArray(shaderProgram.vertexPositionAttribute);
+
+
+        shaderProgram.vertexNormalAttribute= gl.getAttribLocation(shaderProgram,"normal");
+        gl.enableVertexAttribArray(shaderProgram.vertexNormalAttribute);
+
+        shaderProgram.vertexTextureAttribute= gl.getAttribLocation(shaderProgram,"uv");
+        gl.enableVertexAttribArray(shaderProgram.vertexTextureAttribute);
+        
+        
+        
+        shaderProgram.pMatrixUniform = gl.getUniformLocation(shaderProgram, "projectionMatrix");
+        shaderProgram.mvMatrixUniform = gl.getUniformLocation(shaderProgram, "modelViewMatrix");
+        shaderProgram.samplerUniform = gl.getUniformLocation(shaderProgram, "iChannel1");
+        shaderProgram.timeUniform= gl.getUniformLocation(shaderProgram,"iGlobalTime");
+        shaderProgram.resoUniform= gl.getUniformLocation(shaderProgram,"resolution");
+    }
+
+
+   
+
+    function setMatrixUniforms() {
+        var d = new Date(); // for now
+        var h=d.getHours(); // =>
+        var m=d.getMinutes(); // 
+       var s=d.getSeconds(); // 
+       var ms= d.getMilliseconds();
+        var time = m*60*1000+ s*1000 + ms;
+        
+     
+        gl.uniform1i(shaderProgram.samplerUniform, 0);
+        gl.uniform2fv(shaderProgram.resoUniform,[720.0,480.0]);
+        gl.uniform1f(shaderProgram.timeUniform,time );
+        gl.uniformMatrix4fv(shaderProgram.pMatrixUniform, false, pMatrix);
+        gl.uniformMatrix4fv(shaderProgram.mvMatrixUniform, false, mvMatrix);
+    }
+
+
+    function initbuffers()
+    {
+        
+        vertexPositionBuffer=gl.createBuffer();
+        vertexNormalBuffer=gl.createBuffer();
+        vertexTextureBuffer=gl.createBuffer();
+    }
+
+    function quadBuffer() {
+        
+   
+     
+        vertexPositionBuffer.itemSize = 3;
+        vertexPositionBuffer.numItems = 4;
+        gl.bindBuffer(gl.ARRAY_BUFFER, vertexPositionBuffer);
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.STATIC_DRAW);
+
+        gl.vertexAttribPointer(shaderProgram.vertexPositionAttribute, vertexPositionBuffer.itemSize, gl.FLOAT, false, 0, 0);
+
+
+        vertexNormalBuffer.itemSize = 3;
+        vertexNormalBuffer.numItems = 4;
+        gl.bindBuffer(gl.ARRAY_BUFFER, vertexNormalBuffer); 
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(normals), gl.STATIC_DRAW);
+        
+        gl.vertexAttribPointer(shaderProgram.vertexNormalAttribute, vertexNormalBuffer.itemSize, gl.FLOAT, false, 0, 0);
+
+        vertexTextureBuffer.itemSize = 2.0;
+        vertexTextureBuffer.numItems = 4.0;
+        gl.bindBuffer(gl.ARRAY_BUFFER, vertexTextureBuffer); 
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(textures), gl.STATIC_DRAW);
+        gl.vertexAttribPointer(shaderProgram.vertexTextureAttribute, vertexTextureBuffer.itemSize, gl.FLOAT, false, 0, 0);
+
+        
+    }
+    
+    function handleLoadedTexture(texture) {
+    gl.bindTexture(gl.TEXTURE_2D, texture);
+    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, texture.image);
+     gl.generateMipmap(gl.TEXTURE_2D);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
+    gl.activeTexture(gl.TEXTURE0);
+    
+  }
+
+    
+
+    
+
+    function initTexture()
+    {
+       texture = gl.createTexture();
+        texture.image= new Image();
+        texture.image.src="mountexture.jpg";
+        texture.image.onload=function(){ handleLoadedTexture(texture);};
+       
+  
+    }
+
+    
+    function drawScene() 
+	{
+        gl.viewport(0, 0, gl.viewportWidth, gl.viewportHeight);
+        gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+		mat4.ortho(pMatrix,-1.,1.,-1.,1.,-1.,1.);
+		mat4.identity(mvMatrix);
+        quadBuffer();
+        setMatrixUniforms();
+        gl.drawArrays(gl.TRIANGLE_STRIP, 0, vertexPositionBuffer.numItems);
+        var executioncheck=document.getElementById("haltexec");
+        executioncheck=executioncheck.innerHTML;
+        if(executioncheck==1){ requestAnimationFrame(drawScene);}
+        else{document.getElementById("haltexec").innerHTML=1;}
+		
+    }
+
+
+    function webGLStart(number) {
+        var canvas = document.getElementById("mycanvas1");
+        initGL(canvas);
+        initShaders(number);
+        gl.clearColor(0.0, 0.0, 0.0, 1.0);
+        gl.enable(gl.DEPTH_TEST);
+        initbuffers();
+        initTexture();
+        drawScene();
+        
+    }
+
+</script>
+
+ 
+  
+    
+    <script>
+            var currgraph=1
+
+    
+             $(document).ready(function() {
+              var icon = $('.play');
+              icon.click(function() {
+                 icon.toggleClass('active');
+                 return false;
+              });
+            });
+
+            
+            
+            
+            function stop()
+        {
+          
+            haltexec();
+            
+        }
+            
+            function start1()
+    {
+        currgraph=1;
+        haltexec();
+       webGLStart(1);
+        
+    }
+    
+        
+                function start2()
+    {
+        currgraph=2;
+        haltexec();
+        webGLStart(2);
+    }
+        
+
+        
+            function haltexec()
+    {
+        var executioncheck=document.getElementById("haltexec");
+        if(executioncheck.innerHTML==1)
+            {
+        executioncheck.innerHTML=0;
+            }
+        else{
+                    executioncheck.innerHTML=1;
+
+        }
+        
+        
+    }
+    
+        
+        
+    </script>
+    
+    
+    
+    
+<script id="jsbin-javascript">
+var slideIndex = 1;
+showDivs(slideIndex);
+
+function plusDivs(n) {
+  showDivs(slideIndex += n);
+}
+    
+    function currentSlide(n) {
+  showSlides(slideIndex = n);
+}
+
+
+function showDivs(n) {
+  var i;
+  var x = document.getElementsByClassName("mySlides");
+  var dots = document.getElementsByClassName("dot");
+  if (n > x.length) {slideIndex = 1}    
+  if (n < 1) {slideIndex = x.length}
+  for (i = 0; i < x.length; i++) {
+     x[i].style.display = "none";  
+  }
+    for (i = 0; i < dots.length; i++) {
+      dots[i].className = dots[i].className.replace(" active", "");
+  }
+  x[slideIndex-1].style.display = "block";  
+      dots[slideIndex-1].className += " active";
+
+}
+
+</script>
+    <script>
+    (function($){
+    $(window).keyup(function(e){
+        var key = e.which | e.keyCode;
+        if(key === 37){ 
+            $('.left').click();
+        }
+        else if(key === 39){ 
+            $('.right').click();
+        }
+        else if(key === 27){
+            $('#SLIDECONTAINER').toggle();
+        }
+    });
+    })(jQuery);
+    </script>
+
+
+<body onload="webGLStart(1)">
+    <div id="MEGACONTAINER">
+    <canvas id="mycanvas1" width= 720 height=480 ></canvas>
+        <div id="SLIDECONTAINER">
+     
+                       
+  <div id="haltexec">1</div>
+            
+            <div class="mySlides Intro" >
+      <b>Introduction to WebGL   </b> 
+ Karalias Nikolaos
+<img src="WebGL_Logo.png">
+            </div>
+            
+ 
+            
+     <div class="mySlides" > <span> 
+         
+WebGL is a low level rasterization API that enables the display   of realtime 3D graphics on a web browser. It offers a fully  programmmable graphics pipeline. Its syntax is based on OpenGL ES 2.0 and it supports hardware acceleration. </span>
+             </div>
+            
+                    
+     <div class="mySlides" >
+         
+         
+WebGL uses javascript for the "core" development. This is made possible by the <b>canvas</b> element in modern HTML. The shaders are written in <b>GLSL</b>, a high level shading language.
+         
+             </div>
+            
+     <div class="mySlides" ><img src="pipeline.png" width="100%" height="100%">      </div>
+            
+                 <div class="mySlides" >  <span> <b>Main tasks </b><ul><li>Set up WebGL context in canvas</li> <li>Set up shaders, buffers, attributes, and uniforms</li> <li>Write javascript skeleton</li> <li> Pass uniforms and vertex attributes to shaders</li> </ul>         
+         </span>
+             </div>
+            
+            
+            
+            <div class="mySlides Code" >    <b> A simple vertex shader</b>        
+    attribute vec3 aVertexPosition;
+    uniform mat4 uMVMatrix;
+    uniform mat4 uPMatrix;
+    varying vec3 position;
+    void main(void) { 
+    gl_Position = uPMatrix * uMVMatrix * vec4(aVertexPosition, 1.0); 
+    position= aVertexPosition;
+    }
+         
+             </div>
+            
+            
+            
+             <div class="mySlides" >  <span>              
+ Values are passed from the vertex to the fragment shader as <b>varying</b> variables. The value corresponding to each fragment is calculated via interpolation. So in our example of the variable <b>position</b>, the position values for fragments that are between two vertices are linearly interpolated from the vertex positions.                                                         
+ 
+         </span>
+             </div>
+            
+            
+             <div class="mySlides Code" >    <b> A simple fragment shader</b> 
+    precision mediump float;
+    varying vec3 position;             
+    void main(void) {
+    gl_FragColor = vec4(1.0, 1.0, 1.0, 1.0);
+    }
+         
+             </div>
+            
+            
+            <div class="mySlides Code" > <b>     Main function</b> 
+      function webGLStart() {
+      var canvas = document.getElementById("mycanvas");
+      initGL(canvas);
+      initShaders();
+      gl.clearColor(0.0, 0.0, 0.0, 1.0);
+      gl.enable(gl.DEPTH_TEST);
+      initbuffers();
+      initTexture();
+      drawScene();  
+    }
+            
+                </div>        
+
+            
+                         <div class="mySlides" >  <span>
+                                                         
+ Writing the javascript skeleton can be done with the help of math libraries such as <b>gl-Matrix</b>. This can simplify  calculations  for vertex normals, projection matrices, etc.
+         </span>
+             </div>
+            
+            
+                   
+            <div class="mySlides Code" > <b>    Main animation loop</b> 
+     function drawScene() {
+     gl.viewport(0, 0, gl.viewportWidth, gl.viewportHeight);
+     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+     mat4.ortho(pMatrix,-1.,1.,-1.,1.,-1.,1.);
+     mat4.identity(mvMatrix);
+     quadBuffer(); //specifies 4 vertex positions and buffers them
+     setMatrixUniforms();
+     gl.drawArrays(gl.TRIANGLE_STRIP, 0, vertexPositionBuffer.numItems); 
+	 requestAnimationFrame(drawScene);	
+    } 
+    
+            
+                </div>        
+
+            
+                                          <div class="mySlides" >  <span>
+                                                         
+All the relevant information about the geometry(vertex positions, normals, colors, texture coordinates) are passed on to the shaders through buffers.
+         </span>
+             </div>
+                              
+            
+             <div class="mySlides Code" >    <b>Passing the vertex positions</b>     
+    vertexPositionBuffer.itemSize = 3;
+    vertexPositionBuffer.numItems = 4;
+    gl.bindBuffer(gl.ARRAY_BUFFER, vertexPositionBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.STATIC_DRAW);
+    gl.vertexAttribPointer(shaderProgram.vertexPositionAttribute,
+    vertexPositionBuffer.itemSize, gl.FLOAT, false, 0, 0);
+            
+            </div>
+            
+            
+                                            <div class="mySlides" >  <span>                                                
+One of the main advantages of the programmable pipeline is the flexiblity it provides the developer. While lighting computations can be carried out on a <b>per vertex</b> basis and the colors interpolated per fragment, it is also possible to calculate the lighting <b>per pixel</b> on the fragment shader. This can result in a more realistically illuminated scene. However, this can also increase the computational cost.
+         </span>
+             </div>
+            
+                                                        <div class="mySlides" >  <span>                                                
+      <b>So,  how did you make these mountains in the background?</b>
+
+     Again, the power of the fragment shader comes into play. These mountains(and much more) can be achieved through a technique called raymarching. It is method of creating procedural graphics. 
+                                                            
+         </span>
+             </div>
+            
+            
+            
+                                                        <div class="mySlides" >  <span>                                                
+      The only geometry required for this complex landscape is a quad. All the calculations are carried out on the fragment shader.
+    See: <p><a href="http://www.iquilezles.org/www/material/nvscene2008/rwwtt.pdf">Rendering a world with two triangles</a></p>                
+                                                            
+         </span>
+             </div>
+            
+            
+            
+                        
+                                            <div class="mySlides" >  <span>                                                
+        In fact, this approach makes it possible to render surfaces without an analytical intersection routine as a standard raytracing algorithm would require. That is achieved throught what is called <b>distance field</b> rendering. The surfaces can be anything from simple models like boxes and spheres, to more complex structures like fractals. 
+                                                            
+         </span>
+             </div>
+            
+            
+            
+                 <div class="mySlides" ><img src="ray_marching.png" width="90%" height="100%">      </div>
+
+            
+                               
+                                            <div class="mySlides" >  <span>                              
+    The goal is to estimate a lower bound of the distance to the closest surface at every step of the marching ray.
+        Various distance functions are used for that purpose.  Furthermore, several operations can be defined 
+    on the surfaces such as deformations, repetitions, combinations, etc. All of the above constitute important tools sufficient for <b> procedural modeling</b>. 
+                                                            
+         </span>
+             </div>
+            
+            
+            
+            <div class="mySlides Code" >    <b>Main raymarching loop</b>  
+  vec3 rayMarch(vec3 pos,vec3 rayDir,float EPSILON,out vec2 dist){
+    float mini=999999.0;
+    for (int i = 0; i &lt 120; i++) {       
+        if ((dist.x &lt EPSILON))   continue;   
+        dist = distfunc(pos); //distance function
+        pos += dist.x * rayDir;
+        if(dist.x &lt; mini) mini=dist.x;
+     }
+    return pos;
+    }
+                
+                
+            </div>
+            
+            
+          
+          
+            
+                                                   <div class="mySlides" >  <span>                              
+  The scene animated in the background is another example of a fully procedural scene. Apart from the geometry, it is also possible to achieve effects like soft shadows and antialiasing.
+                                                            
+         </span>
+             </div>
+            
+            
+            <div class="mySlides" >  <span>         For more on distance fields, raymarching and procedural graphics in general,  Inigo Quilez's website  is highly recommended.   <p><a href="http://www.iquilezles.org/www/index.htm">http://www.iquilezles.org/www/index.htm</a></p>  
+                                 
+     Special thanks to George Tz/Leriaz for helping me out with the web coding part of this  presentation.-
+                                                            
+         </span>
+             </div>
+            
+            
+            
+            </div>
+   <a class="left" onclick="plusDivs(-1)">&#10094;</a>
+  <a class="right" onclick="plusDivs(1)">&#10095;</a>
+        </div>
+    
+    
+
+    
+    
+       <!-- <div style="text-align:center;">
+  <div id="dot1" class="play" onclick="stop()" ></div>
+  <div id="dot2" class="dot no1" onclick="start1()"></div> 
+  <div id="dot3" class="dot no2" onclick="start2()"></div> 
+        </div>-->
+    
+    <div id="BACKUP_GENERATOR_CHOO_CHOO">
+    
+        <button class="a" id="ONE" onclick="start1()">
+            one
+        </button>
+        <button class="a" id="TWO" onclick="start2()">
+            two
+        </button><hr style="visibility:hidden;">
+        <button class="a" id="CLEAR" onclick="stop()"><span>STOP</span>
+        </button>
+    
+    </div>
+    
+    
+    <script>
+        $("#CLEAR").click(function() {
+             $("#CLEAR span").html($("#CLEAR span").html() == 'STOP' ? 'RESUME' : 'STOP');
+            });
+    </script>
+    
+    
+    <script type="text/javascript">
+  var slideIndex = 1;
+showDivs(slideIndex);
+</script>
+
+
+
+
+
+  </body>
+ 
+    
+   
+
+</html>

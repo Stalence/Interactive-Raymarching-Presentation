@@ -1,0 +1,343 @@
+body {
+    background-color: #efefef;
+    background-image: url('cubes.png');
+}
+
+#mycanvas1 {
+    width: 960;
+    height: 540;
+    border: none;
+    border-radius: 1px;
+    box-shadow: 2px 2px 40px 20px rgba(0, 0, 0, 0.45);
+    background: #666;
+    padding: 0;
+    margin: auto;
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 1;
+}
+
+#MEGACONTAINER {
+    width: 960;
+    height: 540;
+    padding: 0;
+    margin: auto;
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    right: 0;
+}
+
+#Slide {
+    color: black;
+    font-family: Ξ²ΒΒPalatino LinotypeΞ²ΒΒ, Ξ²ΒΒBook AntiquaΞ²ΒΒ, Palatino, serif;
+    font-size: 50px;
+    text-align: center;
+    width: 80%;
+    height: 80%;
+    border: none;
+    border-radius: 1px;
+    box-shadow: 2px 2px 16px 4px rgba(0, 0, 0, 0.2);
+    padding: 0;
+    margin: auto;
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 2;
+    background-color: ghostwhite;
+    opacity: 0.9;
+}
+
+.mySlides {
+    font-family: Ξ²ΒΒPalatino LinotypeΞ²ΒΒ, Ξ²ΒΒBook AntiquaΞ²ΒΒ, Palatino, serif;
+    font-size: 2em;
+    text-align: center;
+    vertical-align: text-bottom;
+    width: 80%;
+    height: 80%;
+    border: none;
+    line-height: 40px;
+    border-radius: 1px;
+    box-shadow: 2px 2px 16px 4px rgba(0, 0, 0, 0.2);
+    z-index: 2;
+    background-color: ghostwhite;
+    opacity: 0.8;
+    padding: 0;
+    margin: auto;
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    display: inline-block;
+    white-space: pre-wrap;
+    background-image: url('furley_bg.png');
+}
+
+span {
+    display: inline-block;
+    vertical-align: middle;
+}
+
+.mySlides.Intro {
+    font-family: Ξ²ΒΒPalatino LinotypeΞ²ΒΒ, Ξ²ΒΒBook AntiquaΞ²ΒΒ, Palatino, serif;
+    font-size: 3em;
+    text-align: center;
+    line-height: 220%;
+    width: 80%;
+    height: 80%;
+    border: none;
+    border-radius: 1px;
+    box-shadow: 2px 2px 16px 4px rgba(0, 0, 0, 0.2);
+    z-index: 2;
+    background-color: ghostwhite;
+    opacity: 0.8;
+    margin: auto;
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background-image: url('furley_bg.png');
+}
+
+.mySlides.Code {
+    font-family: Ξ²ΒΒPalatino LinotypeΞ²ΒΒ, Ξ²ΒΒBook AntiquaΞ²ΒΒ, Palatino, serif;
+    font-size: 1.3em;
+    text-align: left;
+    vertical-align: text-bottom;
+    width: 80%;
+    height: 80%;
+    border: none;
+    line-height: 40px;
+    border-radius: 1px;
+    box-shadow: 2px 2px 16px 4px rgba(0, 0, 0, 0.2);
+    z-index: 2;
+    background-color: ghostwhite;
+    opacity: 0.8;
+    padding: 0;
+    margin: auto;
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    display: inline-block;
+    white-space: pre-wrap;
+    background-image: url('furley_bg.png');
+}
+
+
+/* Slideshow container */
+
+.slideshow-container {
+    max-width: 1000px;
+    position: relative;
+    margin: auto;
+}
+
+
+/* Next & previous buttons */
+
+.right {
+    cursor: pointer;
+    position: absolute;
+    margin-right: -5%;
+    margin-top: 25%;
+    width: auto;
+    color: black;
+    font-weight: bold;
+    font-size: 48px;
+    transition: 0.6s ease;
+    border-radius: 0 3px 3px 0;
+}
+
+.left {
+    cursor: pointer;
+    position: absolute;
+    margin-left: -5%;
+    margin-top: 25%;
+    width: auto;
+    color: black;
+    font-weight: bold;
+    font-size: 48px;
+    transition: 0.6s ease;
+    border-radius: 0 3px 3px 0;
+}
+
+
+/* Position the "next button" to the right */
+
+.right {
+    right: 0;
+    border-radius: 3px 0 0 3px;
+}
+
+
+/* On hover, add a black background color with a little bit see-through */
+
+.left:hover,
+.right:hover {
+    /*background-color: rgba(0, 0, 0, 0.8);*/
+    color: ghostwhite;
+}
+
+
+/* Caption text */
+
+.text {
+    color: #f2f2f2;
+    font-size: 15px;
+    padding: 8px 12px;
+    position: absolute;
+    bottom: 8px;
+    width: 100%;
+    text-align: center;
+}
+
+
+/* Number text (1/3 etc) */
+
+.numbertext {
+    color: #f2f2f2;
+    font-size: 12px;
+    padding: 8px 12px;
+    position: absolute;
+    top: 0;
+}
+
+
+/* The dots/bullets/indicators */
+
+.dot {
+    cursor: pointer;
+    height: 13px;
+    width: 13px;
+    margin-top: 10%;
+    background-color: #bbb;
+    border-radius: 50%;
+    display: inline-flex;
+    transition: background-color 0.6s ease;
+}
+
+.play {
+    cursor: pointer;
+    height: 63px;
+    width: 63px;
+    margin-top: 45%;
+    margin-left: 50%;
+    background-color: #bbb;
+    border-radius: 50%;
+    transition: background-color 0.6s ease;
+    background: url('stop.png') repeat 0 0;
+    ;
+    background-size: 100% 100%;
+}
+
+.active {
+    cursor: pointer;
+    height: 63px;
+    width: 63px;
+    margin-bottom: -35%;
+    background-color: #bbb;
+    border-radius: 100%;
+    background: url('play.png');
+    background-size: 100% 100%;
+}
+
+active,
+.play:hover {
+    background-color: #717171;
+}
+
+#BACKUP_GENERATOR_CHOO_CHOO {
+    margin: 45% auto;
+    width: 60%;
+    text-align: center;
+}
+
+.dot.no1 {
+    cursor: pointer;
+    height: 63px;
+    width: 63px;
+    margin-left: 0%;
+    margin-top: 35.3%;
+    background-color: #bbb;
+    border-radius: 10%;
+    transition: background-color 0.6s ease;
+    background: url('numbers-1.png') repeat 0 0;
+    ;
+    background-size: 100% 100%;
+}
+
+.dot.no2 {
+    cursor: pointer;
+    height: 63px;
+    width: 63px;
+    position: absolute;
+    margin-right: 5%;
+    margin-top: 35%;
+    background-color: #bbb;
+    border-radius: 10%;
+    transition: background-color 0.6s ease;
+    background: url('numbers-2.png') repeat 0 0;
+    ;
+    background-size: 100% 100%;
+}
+
+active,
+.dot:hover {
+    background-color: #717171;
+}
+
+.a {
+    background-color: #009ac9;
+    border: 1px solid transparent;
+    color: #ffffff;
+    -webkit-border-radius: 3px;
+    font-size: 1em;
+    border-radius: 3px;
+    -webkit-transition: all 0.3s ease-in-out;
+    -moz-transition: all 0.3s ease-in-out;
+    transition: all 0.3s ease-in-out;
+}
+
+.a:hover {
+    background-color: #ffffff;
+    color: #009ac9;
+    border-color: #009ac9;
+}
+
+
+/* Fading animation */
+
+.fade {
+    -webkit-animation-name: fade;
+    -webkit-animation-duration: 1.5s;
+    animation-name: fade;
+    animation-duration: 1.5s;
+}
+
+@-webkit-keyframes fade {
+    from {
+        opacity: .4
+    }
+    to {
+        opacity: 1
+    }
+}
+
+@keyframes fade {
+    from {
+        opacity: .4
+    }
+    to {
+        opacity: 1
+    }
+}
